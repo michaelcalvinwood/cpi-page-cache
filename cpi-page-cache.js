@@ -43,7 +43,8 @@ const getCategories = async host => {
 const createPageCacheTable = async (name = '') => {
     const q = `CREATE TABLE IF NOT EXISTS ${name ? `page_cache_${name}` : `page_cache`} (
         path VARCHAR(256) NOT NULL PRIMARY KEY,
-        html LONGTEXT
+        html LONGTEXT,
+        orig_html LONGTEXT
     )`
 
     const r = await sql.query(q);
@@ -53,12 +54,18 @@ const createPageCacheTable = async (name = '') => {
 
 const updateCategoryCache = async (category) => {
     let response = await axios.get(`https://epsilon.competitionpolicyinternational.com/category/${category.slug}`);
-    const dom = cheerio.load(response.data);
+    const origHtml = response.data;
+    const dom = cheerio.load(origHtml);
     //console.log('got dom', dom.html());
     dom('script').each((index, el) => {
-       dom(el).text('console.log("removed script here")');
+       dom(el).text('console.log("removed script here");');
     })
-    console.log(dom.html());
+    const html = dom.html();
+    const q = `INSERT INTO page_cache_category (path, html, orig_html) VALUES (${sql.escape(category.slug)}, ${sql.escape(html)}, ${sql.escape(origHtml)})
+    ON DUPLICATE KEY UPDATE html = ${sql.escape(html)}, orig_html = ${sql.escape(origHtml)}`;
+
+    await sql.query(q);
+    
 }
 
 const program = async () => {
@@ -70,8 +77,8 @@ const program = async () => {
     const categories = JSON.parse(categoriesJson);
 
     for (let i = 0; i < categories.length; ++i) {
+        console.log(i, categories[i].slug);
         await updateCategoryCache(categories[i]);
-        break;
     }
 }
 
