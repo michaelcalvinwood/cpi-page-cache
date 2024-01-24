@@ -38,10 +38,23 @@ const getCategories = async host => {
     
 }
 
+const createPageCacheTable = async (name = '') => {
+    const q = `CREATE TABLE IF NOT EXISTS ${name ? `page_cache_${name}` : `page_cache`} (
+        path VARCHAR(256) NOT NULL PRIMARY KEY,
+        html LONGTEXT
+    )`
+
+    const r = await sql.query(q);
+    console.log('Table Creation Result', r);
+    return r;
+} 
+
 const program = async () => {
-    const categories = await getCategories('www.competitionpolicyinternational.com');
-    const databases = await sql.query(`SHOW DATABASES`)
+    //const categories = await getCategories('www.competitionpolicyinternational.com');
     
+    console.log(await createPageCacheTable('category'))
+    const tables = await sql.query(`SHOW TABLES`)
+    console.log(tables)
 }
 
 const programWrapper = () => {
