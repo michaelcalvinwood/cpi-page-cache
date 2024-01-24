@@ -68,18 +68,41 @@ const updateCategoryCache = async (category) => {
     
 }
 
+const getWpPostTypes = async (host) => {
+    const remove = [
+        'attachment',
+        'wp_block',
+        'um_form',
+    ]
+    const response = await axios.get(`https://${host}/wp-json/wp/v2/types`);
+    const allTypes = Object.keys(response.data);
+    const postTypes = allTypes.filter(type => !remove.find(e => e === type));
+
+}
+
 const program = async () => {
     await createPageCacheTable('category');
     //const categories = await getCategories('www.competitionpolicyinternational.com');
     //fs.writeFileSync('./categories.json', JSON.stringify(categories), 'utf-8');
     
-    const categoriesJson = fs.readFileSync('./categories.json', 'utf-8');
-    const categories = JSON.parse(categoriesJson);
+    /*
+     * Category Cache
+     */
 
-    for (let i = 0; i < categories.length; ++i) {
-        console.log(i, categories[i].slug);
-        await updateCategoryCache(categories[i]);
-    }
+    // const categoriesJson = fs.readFileSync('./categories.json', 'utf-8');
+    // const categories = JSON.parse(categoriesJson);
+
+    // for (let i = 0; i < categories.length; ++i) {
+    //     console.log(i, categories[i].slug);
+    //     await updateCategoryCache(categories[i]);
+    // }
+
+    /*
+     * Post Types Cache
+     */
+
+    const postTypes = await getWpPostTypes(`www.competitionpolicyinternational.com`);
+    for (let i = 0; i < postTypes.length; ++i) await processPostType(postTypes[i]);
 }
 
 const programWrapper = () => {
