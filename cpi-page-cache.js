@@ -1,6 +1,7 @@
 require('dotenv').config();
 const axios = require('axios');
 const mysql = require('mysql2/promise');
+const cheerio = require('cheerio');
 const fs = require('fs');
 
 const { CPI_PRODUCTION_HOST, CPI_PRODUCTION_DATABASE, CPI_PRODUCTION_USER, CPI_PRODUCTION_PASSWORD } = process.env;
@@ -51,8 +52,13 @@ const createPageCacheTable = async (name = '') => {
 } 
 
 const updateCategoryCache = async (category) => {
-    let html = await axios.get(`https://epsilon.competitionpolicyinternational.com/category/${category.slug}`);
-    console.log(html);
+    let response = await axios.get(`https://epsilon.competitionpolicyinternational.com/category/${category.slug}`);
+    const dom = cheerio.load(response.data);
+    //console.log('got dom', dom.html());
+    dom('script').each((index, el) => {
+       dom(el).text('console.log("removed script here")');
+    })
+    console.log(dom.html());
 }
 
 const program = async () => {
@@ -64,8 +70,7 @@ const program = async () => {
     const categories = JSON.parse(categoriesJson);
 
     for (let i = 0; i < categories.length; ++i) {
-        console.log(categories[i]);
-        //await updateCategoryCache(categories[i]);
+        await updateCategoryCache(categories[i]);
         break;
     }
 }
