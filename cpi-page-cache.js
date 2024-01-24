@@ -1,6 +1,7 @@
 require('dotenv').config();
 const axios = require('axios');
 const mysql = require('mysql2/promise');
+const fs = require('fs');
 
 const { CPI_PRODUCTION_HOST, CPI_PRODUCTION_DATABASE, CPI_PRODUCTION_USER, CPI_PRODUCTION_PASSWORD } = process.env;
 
@@ -49,12 +50,24 @@ const createPageCacheTable = async (name = '') => {
     return r;
 } 
 
+const updateCategoryCache = async (category) => {
+    let html = await axios.get(`https://epsilon.competitionpolicyinternational.com/category/${category.slug}`);
+    console.log(html);
+}
+
 const program = async () => {
+    await createPageCacheTable('category');
     //const categories = await getCategories('www.competitionpolicyinternational.com');
+    //fs.writeFileSync('./categories.json', JSON.stringify(categories), 'utf-8');
     
-    console.log(await createPageCacheTable('category'))
-    const tables = await sql.query(`SHOW TABLES`)
-    console.log(tables)
+    const categoriesJson = fs.readFileSync('./categories.json', 'utf-8');
+    const categories = JSON.parse(categoriesJson);
+
+    for (let i = 0; i < categories.length; ++i) {
+        console.log(categories[i]);
+        //await updateCategoryCache(categories[i]);
+        break;
+    }
 }
 
 const programWrapper = () => {
