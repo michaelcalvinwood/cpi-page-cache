@@ -48,24 +48,38 @@ const createPageCacheTable = async (name = '') => {
     )`
 
     const r = await sql.query(q);
-    console.log('Table Creation Result', r);
+    //console.log('Table Creation Result', r);
     return r;
 } 
 
-const updateCategoryCache = async (category) => {
-    let response = await axios.get(`https://epsilon.competitionpolicyinternational.com/category/${category.slug}`);
-    const origHtml = response.data;
+const addCacheEntry = async (path, html, origHtml, type) => {
+    const q = `INSERT INTO page_cache_${type} (path, html, orig_html) VALUES (${sql.escape(path)}, ${sql.escape(html)}, ${sql.escape(origHtml)})
+    ON DUPLICATE KEY UPDATE html = ${sql.escape(html)}, orig_html = ${sql.escape(origHtml)}`;
+
+    await sql.query(q);
+}
+
+const processLink = async (path, type) => {
+    let response = await axios.get(`https://epsilon.competitionpolicyinternational.com/${path}`);
+    console.log(response.data);
+}
+
+const stripScriptTags = origHtml => {
     const dom = cheerio.load(origHtml);
     //console.log('got dom', dom.html());
     dom('script').each((index, el) => {
        dom(el).text('console.log("removed script here");');
     })
     const html = dom.html();
-    const q = `INSERT INTO page_cache_category (path, html, orig_html) VALUES (${sql.escape(category.slug)}, ${sql.escape(html)}, ${sql.escape(origHtml)})
-    ON DUPLICATE KEY UPDATE html = ${sql.escape(html)}, orig_html = ${sql.escape(origHtml)}`;
+    return html;
+}
 
-    await sql.query(q);
+const updateCategoryCache = async (category) => {
+    let response = await axios.get(`https://epsilon.competitionpolicyinternational.com/category/${category.slug}`);
+    const origHtml = response.data;
     
+    const html = stripScriptTags(origHtml);
+    await addCacheEntry(category.slug, html, origHtml);
 }
 
 const getWpPostTypes = async (host) => {
@@ -77,7 +91,50 @@ const getWpPostTypes = async (host) => {
     const response = await axios.get(`https://${host}/wp-json/wp/v2/types`);
     const allTypes = Object.keys(response.data);
     const postTypes = allTypes.filter(type => !remove.find(e => e === type));
+    return postTypes;
 
+}
+
+const processPostType = async (postType, host, startingPage = 1) => {
+    switch (postType) {
+        case 'post':
+        case 'page':
+            postType += 's';
+            break;
+    }
+
+    console.log('processing post type', postType);
+    await createPageCacheTable(postType);
+
+    let page = startingPage;
+    const perPage = 100;
+    let posts = [];
+    do {
+        console.log(`Fetching page ${page} from ${postType}`);
+        const response = await axios.get(`https://${host}/wp-json/wp/v2/${postType}/?page=${page}&per_page=100`);
+        posts = response.data;
+        console.log(posts.length); 
+        
+        for (let i = 0; i < posts.length; ++i) {
+            //console.log(posts[i]);
+            const path = posts[i].link.substring(8 + host.length);
+            try {
+
+                const response = await axios.get(`https://${host}${path}`);
+                const origHtml = response.data;
+                const html = stripScriptTags(origHtml);
+                await addCacheEntry (path, html, origHtml, postType)
+                console.log(postType, path);
+            } catch (err) {
+                console.log('ERROR: ', postType, path);
+            }
+            //if (postType === 'posts') break;
+        }
+        ++page;
+        //break;
+        
+    } while (posts.length);
+    
 }
 
 const program = async () => {
@@ -102,7 +159,12 @@ const program = async () => {
      */
 
     const postTypes = await getWpPostTypes(`www.competitionpolicyinternational.com`);
-    for (let i = 0; i < postTypes.length; ++i) await processPostType(postTypes[i]);
+    console.log(postTypes);
+
+    for (let i = 0; i < postTypes.length; ++i) {
+        const startPage = postTypes[i] === 'post' ? 211 : 1;
+        await processPostType(postTypes[i], `www.competitionpolicyinternational.com`, startPage);
+    }
 }
 
 const programWrapper = () => {
